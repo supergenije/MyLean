@@ -16,7 +16,7 @@
 
 using System;
 using System.Linq;
-// using QuantConnect.Util;
+using QuantConnect.Util;
 using QuantConnect.Logging;
 using QuantConnect.Securities;
 using QuantConnect.Data.Market;

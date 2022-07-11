@@ -21,7 +21,7 @@ using QuantConnect.Orders;
 using QuantConnect.Orders.Fees;
 using QuantConnect.Securities;
 using QuantConnect.Securities.Option;
-// using QuantConnect.Util;
+using QuantConnect.Util;
 
 namespace QuantConnect.Brokerages.Backtesting
 {
