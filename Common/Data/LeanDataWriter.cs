@@ -188,7 +188,7 @@ namespace QuantConnect.Data
                 throw new ArgumentException($"DownloadAndSave(): All symbols must have {_securityType} security type.");
             }
 
-            if (symbols.DistinctBy(x => x.ID.Symbol).Count() > 1)
+            if (Enumerable.DistinctBy(symbols, x => x.ID.Symbol).Count() > 1)
             {
                 throw new ArgumentException("DownloadAndSave(): All symbols must have the same root ticker.");
             }
