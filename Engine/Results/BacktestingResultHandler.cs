@@ -106,10 +106,10 @@ namespace QuantConnect.Lean.Engine.Results
         {
             try
             {
-                while (!(ExitTriggered && Messages.Count == 0))
+                while (!(ExitTriggered && Messages.IsEmpty))
                 {
                     //While there's no work to do, go back to the algorithm:
-                    if (Messages.Count == 0)
+                    if (Messages.IsEmpty)
                     {
                         ExitEvent.WaitOne(50);
                     }
@@ -145,7 +145,7 @@ namespace QuantConnect.Lean.Engine.Results
             try
             {
                 //Sometimes don't run the update, if not ready or we're ending.
-                if (Algorithm?.Transactions == null || ExitTriggered)
+                if (Algorithm?.Transactions == null || ExitTriggered || !Algorithm.GetLocked())
                 {
                     return;
                 }
@@ -186,7 +186,7 @@ namespace QuantConnect.Lean.Engine.Results
                             deltaCharts.Add(chart.Name, updates);
                         }
 
-                        // Update our algorithm performance charts 
+                        // Update our algorithm performance charts
                         if (AlgorithmPerformanceCharts.Contains(kvp.Key))
                         {
                             performanceCharts[kvp.Key] = chart.Clone();
@@ -272,6 +272,7 @@ namespace QuantConnect.Lean.Engine.Results
             //Add any user runtime statistics into the backtest.
             splitPackets.Add(new BacktestResultPacket(_job, new BacktestResult { ServerStatistics = serverStatistics, RuntimeStatistics = runtimeStatistics }, Algorithm.EndDate, Algorithm.StartDate, progress));
 
+
             return splitPackets;
         }
 
@@ -306,7 +307,8 @@ namespace QuantConnect.Lean.Engine.Results
                             result.Results.RollingWindow,
                             null, // null order events, we store them separately
                             result.Results.TotalPerformance,
-                            result.Results.AlphaRuntimeStatistics));
+                            result.Results.AlphaRuntimeStatistics,
+                            result.Results.AlgorithmConfiguration));
                     }
                     // Save results
                     SaveResults(key, results);
@@ -353,7 +355,9 @@ namespace QuantConnect.Lean.Engine.Results
                     var orderEvents = TransactionHandler.OrderEvents.ToList();
                     //Create a result packet to send to the browser.
                     result = new BacktestResultPacket(_job,
-                        new BacktestResult(new BacktestResultParameters(charts, orders, profitLoss, statisticsResults.Summary, runtime, statisticsResults.RollingPerformances, orderEvents, statisticsResults.TotalPerformance, AlphaRuntimeStatistics)),
+                        new BacktestResult(new BacktestResultParameters(charts, orders, profitLoss, statisticsResults.Summary, runtime,
+                            statisticsResults.RollingPerformances, orderEvents, statisticsResults.TotalPerformance, AlphaRuntimeStatistics,
+                            AlgorithmConfiguration.Create(Algorithm))),
                         Algorithm.EndDate, Algorithm.StartDate);
                 }
                 else
@@ -468,7 +472,7 @@ namespace QuantConnect.Lean.Engine.Results
         }
 
         /// <summary>
-        /// Send list of security asset types the algortihm uses to browser.
+        /// Send list of security asset types the algorithm uses to browser.
         /// </summary>
         public virtual void SecurityType(List<SecurityType> types)
         {

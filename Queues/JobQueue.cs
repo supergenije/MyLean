@@ -118,8 +118,8 @@ namespace QuantConnect.Queues
                 TickLimit = Config.GetInt("symbol-tick-limit", 10000),
                 RamAllocation = int.MaxValue,
                 MaximumDataPointsPerChartSeries = Config.GetInt("maximum-data-points-per-chart-series", 4000),
-                StorageLimitMB = Config.GetInt("storage-limit-mb", 5),
-                StorageFileCount = Config.GetInt("storage-file-count", 100),
+                StorageLimit = Config.GetValue("storage-limit", 10737418240L),
+                StorageFileCount = Config.GetInt("storage-file-count", 10000),
                 StoragePermissions = (FileAccess)Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
             };
 
@@ -146,7 +146,8 @@ namespace QuantConnect.Queues
                     DeployId = algorithmId,
                     Parameters = parameters,
                     Language = Language,
-                    Controls = controls
+                    Controls = controls,
+                    PythonVirtualEnvironment = Config.Get("python-venv")
                 };
 
                 Type brokerageName = null;
@@ -196,7 +197,7 @@ namespace QuantConnect.Queues
             }
 
             //Default run a backtesting job.
-            var backtestJob = new BacktestNodePacket(0, 0, "", new byte[] { }, "local")
+            var backtestJob = new BacktestNodePacket(0, 0, "", new byte[] { }, Config.Get("backtest-name", "local"))
             {
                 Type = PacketType.BacktestNode,
                 Algorithm = File.ReadAllBytes(AlgorithmLocation),
@@ -210,7 +211,8 @@ namespace QuantConnect.Queues
                 BacktestId = algorithmId,
                 Language = Language,
                 Parameters = parameters,
-                Controls = controls
+                Controls = controls,
+                PythonVirtualEnvironment = Config.Get("python-venv")
             };
 
             return backtestJob;

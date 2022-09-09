@@ -407,7 +407,7 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <param name="T">The data type</param>
         /// <param name="name">A unique name for this universe</param>
-        /// <param name="resolution">The epected resolution of the universe data</param>
+        /// <param name="resolution">The expected resolution of the universe data</param>
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
         [DocumentationAttribute(Universes)]
         public Universe AddUniverse(PyObject T, string name, Resolution resolution, PyObject selector)
@@ -422,7 +422,7 @@ namespace QuantConnect.Algorithm
         /// </summary>
         /// <param name="T">The data type</param>
         /// <param name="name">A unique name for this universe</param>
-        /// <param name="resolution">The epected resolution of the universe data</param>
+        /// <param name="resolution">The expected resolution of the universe data</param>
         /// <param name="universeSettings">The settings used for securities added by this universe</param>
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
         [DocumentationAttribute(Universes)]
@@ -453,7 +453,7 @@ namespace QuantConnect.Algorithm
         /// <param name="T">The data type</param>
         /// <param name="securityType">The security type the universe produces</param>
         /// <param name="name">A unique name for this universe</param>
-        /// <param name="resolution">The epected resolution of the universe data</param>
+        /// <param name="resolution">The expected resolution of the universe data</param>
         /// <param name="market">The market for selected symbols</param>
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
         [DocumentationAttribute(Universes)]
@@ -468,7 +468,7 @@ namespace QuantConnect.Algorithm
         /// <param name="T">The data type</param>
         /// <param name="securityType">The security type the universe produces</param>
         /// <param name="name">A unique name for this universe</param>
-        /// <param name="resolution">The epected resolution of the universe data</param>
+        /// <param name="resolution">The expected resolution of the universe data</param>
         /// <param name="market">The market for selected symbols</param>
         /// <param name="universeSettings">The subscription settings to use for newly created subscriptions</param>
         /// <param name="selector">Function delegate that performs selection on the universe data</param>
@@ -484,7 +484,7 @@ namespace QuantConnect.Algorithm
         /// <param name="dataType">The data type</param>
         /// <param name="securityType">The security type the universe produces</param>
         /// <param name="name">A unique name for this universe</param>
-        /// <param name="resolution">The epected resolution of the universe data</param>
+        /// <param name="resolution">The expected resolution of the universe data</param>
         /// <param name="market">The market for selected symbols</param>
         /// <param name="universeSettings">The subscription settings to use for newly created subscriptions</param>
         /// <param name="pySelector">Function delegate that performs selection on the universe data</param>
@@ -947,6 +947,11 @@ namespace QuantConnect.Algorithm
         public PyObject History(PyObject type, PyObject tickers, int periods, Resolution? resolution = null)
         {
             var symbols = tickers.ConvertToSymbolEnumerable();
+            if (symbols.Any(symbol => GetResolution(symbol, resolution) == Resolution.Tick))
+            {
+                throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
+            }
+
             var requestedType = type.CreateType();
             var requests = CreateBarCountHistoryRequests(symbols, requestedType, periods, resolution);
 
@@ -1004,11 +1009,14 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public PyObject History(PyObject type, Symbol symbol, int periods, Resolution? resolution = null)
         {
-            if (resolution == Resolution.Tick) throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
+            resolution = GetResolution(symbol, resolution);
+            if (resolution == Resolution.Tick)
+            {
+                throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
+            }
 
-            var res = GetResolution(symbol, resolution);
             var marketHours = GetMarketHours(symbol);
-            var start = _historyRequestFactory.GetStartTimeAlgoTz(symbol, periods, res, marketHours.ExchangeHours, marketHours.DataTimeZone);
+            var start = _historyRequestFactory.GetStartTimeAlgoTz(symbol, periods, resolution.Value, marketHours.ExchangeHours, marketHours.DataTimeZone);
             return History(type, symbol, start, Time, resolution);
         }
 

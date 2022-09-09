@@ -13,18 +13,13 @@
  * limitations under the License.
 */
 
-using System;
-using System.Linq;
 using System.Collections.Generic;
-using QuantConnect.Data;
-using QuantConnect.Data.Market;
-using QuantConnect.Interfaces;
 using QuantConnect.Securities.Option;
 
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// Regression algorithm excersizing an index covered European style option, using an option price model
+    /// Regression algorithm exercising an index covered European style option, using an option price model
     /// that supports European style options and asserting that the option price model is used.
     /// </summary>
     public class OptionPriceModelForSupportedEuropeanOptionRegressionAlgorithm : OptionPriceModelForOptionStylesBaseRegressionAlgorithm
@@ -46,7 +41,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 1406;
+        public override long DataPoints => 211;
 
         /// <summary>
         /// Data Points count of the algorithm history

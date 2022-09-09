@@ -207,7 +207,7 @@ namespace QuantConnect.Tests.Engine.Setup
             foreach (var symbol in algorithm.Securities.Keys)
             {
                 var config = algorithm.SubscriptionManager.SubscriptionDataConfigService.GetSubscriptionDataConfigs(symbol).First();
-                
+
                 // Assert Resolution and FillForward settings persisted
                 Assert.AreEqual(algorithm.UniverseSettings.Resolution, config.Resolution);
                 Assert.AreEqual(algorithm.UniverseSettings.FillForward, config.FillDataForward);
@@ -540,7 +540,7 @@ namespace QuantConnect.Tests.Engine.Setup
 
             if (!hasCashBalance && !hasHoldings)
             {
-                Assert.That(algorithm.DebugMessages.Count > 0);
+                Assert.IsFalse(algorithm.DebugMessages.IsEmpty);
 
                 Assert.That(algorithm.DebugMessages.Any(x => x.Contains("No cash balances or holdings were found in the brokerage account.")));
             }

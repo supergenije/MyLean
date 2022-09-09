@@ -74,14 +74,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public void SetWarmup(TimeSpan timeSpan, Resolution? resolution)
         {
-            if (_locked)
-            {
-                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
-            }
-
-            _warmupBarCount = null;
-            _warmupTimeSpan = timeSpan;
-            _warmupResolution = resolution;
+            SetWarmup(null, timeSpan, resolution);
         }
 
         /// <summary>
@@ -130,14 +123,7 @@ namespace QuantConnect.Algorithm
         [DocumentationAttribute(HistoricalData)]
         public void SetWarmup(int barCount, Resolution? resolution)
         {
-            if (_locked)
-            {
-                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
-            }
-
-            _warmupTimeSpan = null;
-            _warmupBarCount = barCount;
-            _warmupResolution = resolution;
+            SetWarmup(barCount, null, resolution);
         }
 
         /// <summary>
@@ -182,7 +168,7 @@ namespace QuantConnect.Algorithm
                 var symbols = Securities.Keys;
                 if (symbols.Count != 0)
                 {
-                    var startTimeUtc = CreateBarCountHistoryRequests(symbols, _warmupBarCount.Value, _warmupResolution)
+                    var startTimeUtc = CreateBarCountHistoryRequests(symbols, _warmupBarCount.Value, Settings.WarmupResolution)
                         .DefaultIfEmpty()
                         .Min(request => request == null ? default : request.StartTimeUtc);
                     if(startTimeUtc != default)
@@ -193,9 +179,9 @@ namespace QuantConnect.Algorithm
                 }
 
                 var defaultResolutionToUse = UniverseSettings.Resolution;
-                if (_warmupResolution.HasValue)
+                if (Settings.WarmupResolution.HasValue)
                 {
-                    defaultResolutionToUse = _warmupResolution.Value;
+                    defaultResolutionToUse = Settings.WarmupResolution.Value;
                 }
 
                 // if the algorithm has no added security, let's take a look at the universes to determine
@@ -206,9 +192,9 @@ namespace QuantConnect.Algorithm
                 {
                     var config = universe.Configuration;
                     var resolution = universe.Configuration.Resolution;
-                    if (_warmupResolution.HasValue)
+                    if (Settings.WarmupResolution.HasValue)
                     {
-                        resolution = _warmupResolution.Value;
+                        resolution = Settings.WarmupResolution.Value;
                     }
                     var exchange = MarketHoursDatabase.GetExchangeHours(config);
                     var start = _historyRequestFactory.GetStartTimeAlgoTz(config.Symbol, _warmupBarCount.Value, resolution, exchange, config.DataTimeZone);
@@ -301,11 +287,16 @@ namespace QuantConnect.Algorithm
         {
             var requests = symbols.Select(x =>
             {
+                var res = GetResolution(x, resolution);
+                if (res == Resolution.Tick)
+                {
+                    throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
+                }
+
                 var config = GetMatchingSubscription(x, typeof(T));
                 if (config == null) return null;
 
                 var exchange = GetExchangeHours(x);
-                var res = GetResolution(x, resolution);
                 var start = _historyRequestFactory.GetStartTimeAlgoTz(x, periods, res, exchange, config.DataTimeZone);
                 return _historyRequestFactory.CreateHistoryRequest(config, start, Time, exchange, res);
             });
@@ -328,7 +319,7 @@ namespace QuantConnect.Algorithm
         {
             var requests = symbols.Select(x =>
             {
-                var config = GetMatchingSubscription(x, typeof(T));
+                var config = GetMatchingSubscription(x, typeof(T), resolution);
                 if (config == null) return null;
 
                 return _historyRequestFactory.CreateHistoryRequest(config, start, end, GetExchangeHours(x), resolution);
@@ -385,12 +376,14 @@ namespace QuantConnect.Algorithm
         public IEnumerable<T> History<T>(Symbol symbol, int periods, Resolution? resolution = null)
             where T : IBaseData
         {
-            if (resolution == Resolution.Tick) throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
-
-            var config = GetHistoryRequestConfig(symbol, typeof(T), resolution);
             resolution = GetResolution(symbol, resolution);
-            var start = _historyRequestFactory.GetStartTimeAlgoTz(symbol, periods, resolution.Value, GetExchangeHours(symbol), config.DataTimeZone);
-            return History<T>(symbol, start, Time, resolution).Memoize();
+            if (resolution == Resolution.Tick)
+            {
+                throw new ArgumentException("History functions that accept a 'periods' parameter can not be used with Resolution.Tick");
+            }
+
+            var requests = CreateBarCountHistoryRequests(new [] { symbol }, typeof(T), periods, resolution);
+            return GetDataTypedHistory<T>(symbol, requests);
         }
 
         /// <summary>
@@ -405,10 +398,8 @@ namespace QuantConnect.Algorithm
         public IEnumerable<T> History<T>(Symbol symbol, DateTime start, DateTime end, Resolution? resolution = null)
             where T : IBaseData
         {
-            var config = GetHistoryRequestConfig(symbol, typeof(T), resolution);
-
-            var request = _historyRequestFactory.CreateHistoryRequest(config, start, end, GetExchangeHours(symbol), resolution);
-            return History(request).Get<T>(symbol).Memoize();
+            var requests = CreateDateRangeHistoryRequests(new[] { symbol }, typeof(T), start, end, resolution);
+            return GetDataTypedHistory<T>(symbol, requests);
         }
 
         /// <summary>
@@ -629,25 +620,20 @@ namespace QuantConnect.Algorithm
         }
 
         /// <summary>
-        /// Centralized logic to get a configuration for a symbol, a data type and a resolution
+        /// Centralized logic to get data typed history given a list of requests for the specified symbol.
+        /// This method is used to keep backwards compatibility for those History methods that expect an ArgumentException to be thrown
+        /// when the security and the requested data type do not match
         /// </summary>
-        private SubscriptionDataConfig GetHistoryRequestConfig(Symbol symbol, Type requestedType, Resolution? resolution = null)
+        private IEnumerable<T> GetDataTypedHistory<T>(Symbol symbol, IEnumerable<HistoryRequest> requests)
+            where T : IBaseData
         {
-            if (symbol == null) throw new ArgumentException(_symbolEmptyErrorMessage);
-
-            // verify the types match
-            var config = GetMatchingSubscription(symbol, requestedType, resolution);
-            if (config == null)
+            if (requests == null || !requests.Any())
             {
-                var actualType = GetMatchingSubscription(symbol, typeof(BaseData)).Type;
-                var message = $"The specified security is not of the requested type. Symbol: {symbol} Requested Type: {requestedType.Name} Actual Type: {actualType}";
-                if (resolution.HasValue)
-                {
-                    message += $" Requested Resolution.{resolution.Value}";
-                }
-                throw new ArgumentException(message);
+                throw new ArgumentException($"No history data could be fetched. " +
+                    $"This could be due to the specified security not being of the requested type. Symbol: {symbol} Requested Type: {typeof(T).Name}");
             }
-            return config;
+
+            return History(requests).Get<T>(symbol).Memoize();
         }
 
         [DocumentationAttribute(HistoricalData)]
@@ -921,6 +907,21 @@ namespace QuantConnect.Algorithm
         private bool HistoryRequestValid(Symbol symbol)
         {
             return symbol.SecurityType == SecurityType.Future || !UniverseManager.ContainsKey(symbol) && !symbol.IsCanonical();
+        }
+
+        /// <summary>
+        /// Will set warmup settings validating the algorithm has not finished initialization yet
+        /// </summary>
+        private void SetWarmup(int? barCount, TimeSpan? timeSpan, Resolution? resolution)
+        {
+            if (_locked)
+            {
+                throw new InvalidOperationException("QCAlgorithm.SetWarmup(): This method cannot be used after algorithm initialized");
+            }
+
+            _warmupTimeSpan = timeSpan;
+            _warmupBarCount = barCount;
+            Settings.WarmupResolution = resolution;
         }
     }
 }

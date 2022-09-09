@@ -728,11 +728,14 @@ namespace QuantConnect
         /// <returns>MD5 hash of a string</returns>
         public static string ToMD5(this string str)
         {
-            var builder = new StringBuilder();
+            var builder = new StringBuilder(32);
             using (var md5Hash = MD5.Create())
             {
                 var data = md5Hash.ComputeHash(Encoding.UTF8.GetBytes(str));
-                foreach (var t in data) builder.Append(t.ToStringInvariant("x2"));
+                for (var i = 0; i < 16; i++)
+                {
+                    builder.Append(data[i].ToStringInvariant("x2"));
+                }
             }
             return builder.ToString();
         }
@@ -744,12 +747,14 @@ namespace QuantConnect
         /// <returns>Hashed string.</returns>
         public static string ToSHA256(this string data)
         {
-            var crypt = new SHA256Managed();
-            var hash = new StringBuilder();
-            var crypto = crypt.ComputeHash(Encoding.UTF8.GetBytes(data), 0, Encoding.UTF8.GetByteCount(data));
-            foreach (var theByte in crypto)
+            var hash = new StringBuilder(64);
+            using (var crypt = SHA256.Create())
             {
-                hash.Append(theByte.ToStringInvariant("x2"));
+                var crypto = crypt.ComputeHash(Encoding.UTF8.GetBytes(data));
+                for (var i = 0; i < 32; i++)
+                {
+                    hash.Append(crypto[i].ToStringInvariant("x2"));
+                }
             }
             return hash.ToString();
         }
@@ -1207,6 +1212,16 @@ namespace QuantConnect
         public static string NormalizeToStr(this decimal input)
         {
             return Normalize(input).ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// Helper method to determine the amount of decimal places associated with the given decimal
+        /// </summary>
+        /// <param name="input">The value to get the decimal count from</param>
+        /// <returns>The quantity of decimal places</returns>
+        public static int GetDecimalPlaces(this decimal input)
+        {
+            return BitConverter.GetBytes(decimal.GetBits(input)[3])[2];
         }
 
         /// <summary>
@@ -1831,23 +1846,24 @@ namespace QuantConnect
         /// </summary>
         /// <param name="resolution">The resolution to be converted</param>
         /// <returns>A TimeSpan instance that represents the resolution specified</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static TimeSpan ToTimeSpan(this Resolution resolution)
         {
             switch (resolution)
             {
                 case Resolution.Tick:
                     // ticks can be instantaneous
-                    return TimeSpan.FromTicks(0);
+                    return TimeSpan.Zero;
                 case Resolution.Second:
-                    return TimeSpan.FromSeconds(1);
+                    return Time.OneSecond;
                 case Resolution.Minute:
-                    return TimeSpan.FromMinutes(1);
+                    return Time.OneMinute;
                 case Resolution.Hour:
-                    return TimeSpan.FromHours(1);
+                    return Time.OneHour;
                 case Resolution.Daily:
-                    return TimeSpan.FromDays(1);
+                    return Time.OneDay;
                 default:
-                    throw new ArgumentOutOfRangeException("resolution");
+                    throw new ArgumentOutOfRangeException(nameof(resolution));
             }
         }
 
@@ -2989,9 +3005,27 @@ namespace QuantConnect
         /// <returns></returns>
         public static string RemoveFromEnd(this string s, string ending)
         {
-            if (s.EndsWith(ending))
+            if (s.EndsWith(ending, StringComparison.InvariantCulture))
             {
                 return s.Substring(0, s.Length - ending.Length);
+            }
+            else
+            {
+                return s;
+            }
+        }
+
+        /// <summary>
+        /// Returns a new string in which specified start in the current instance is removed.
+        /// </summary>
+        /// <param name="s">original string value</param>
+        /// <param name="start">the string to be removed</param>
+        /// <returns>Substring with start removed</returns>
+        public static string RemoveFromStart(this string s, string start)
+        {
+            if (!string.IsNullOrEmpty(s) && !string.IsNullOrEmpty(start) && s.StartsWith(start, StringComparison.InvariantCulture))
+            {
+                return s.Substring(start.Length);
             }
             else
             {
@@ -3120,6 +3154,10 @@ namespace QuantConnect
         /// <returns>Enumeration of lines in file</returns>
         public static IEnumerable<string> ReadLines(this IDataProvider dataProvider, string file)
         {
+            if(dataProvider == null)
+            {
+                throw new ArgumentException($"The provided '{nameof(IDataProvider)}' instance is null. Are you missing some initialization step?");
+            }
             var stream = dataProvider.Fetch(file);
             if (stream == null)
             {
@@ -3379,6 +3417,29 @@ namespace QuantConnect
                     throw new ApplicationException(
                         $"The skies are falling and the oceans are rising! Math.Sign({quantity}) returned {sign} :/"
                     );
+            }
+        }
+
+        /// <summary>
+        /// Helper method to process an algorithms security changes, will add and remove securities according to them
+        /// </summary>
+        public static void ProcessSecurityChanges(this IAlgorithm algorithm, SecurityChanges securityChanges)
+        {
+            foreach (var security in securityChanges.AddedSecurities)
+            {
+                security.IsTradable = true;
+
+                // uses TryAdd, so don't need to worry about duplicates here
+                algorithm.Securities.Add(security);
+            }
+
+            var activeSecurities = algorithm.UniverseManager.ActiveSecurities;
+            foreach (var security in securityChanges.RemovedSecurities)
+            {
+                if (!activeSecurities.ContainsKey(security.Symbol))
+                {
+                    security.IsTradable = false;
+                }
             }
         }
 

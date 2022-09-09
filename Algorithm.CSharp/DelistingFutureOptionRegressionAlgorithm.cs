@@ -19,6 +19,7 @@ using QuantConnect.Interfaces;
 using QuantConnect.Securities;
 using System.Collections.Generic;
 using System.Linq;
+using QuantConnect.Orders;
 
 namespace QuantConnect.Algorithm.CSharp
 {
@@ -27,6 +28,7 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     public class DelistingFutureOptionRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
+        protected virtual Resolution Resolution => Resolution.Minute;
         private bool _traded;
         private int _lastMonth;
 
@@ -36,11 +38,15 @@ namespace QuantConnect.Algorithm.CSharp
             SetEndDate(2013, 1, 1);
             SetCash(10000000);
 
-            var dc = AddFuture(Futures.Dairy.ClassIIIMilk, Resolution.Minute, Market.CME);
+            var dc = AddFuture(Futures.Dairy.ClassIIIMilk, Resolution, Market.CME);
             dc.SetFilter(1, 120);
 
             AddFutureOption(dc.Symbol, universe => universe.Strikes(-2, 2));
             _lastMonth = -1;
+
+            // This is required to prevent the algorithm from automatically delisting the underlying. Without this, future options will be subscribed
+            // with resolution default to Minute insted of this.Resolution. This could be replaced after GH issue #6491 is implemented.
+            UniverseSettings.Resolution = Resolution;
         }
 
         public override void OnData(Slice data)
@@ -100,8 +106,8 @@ namespace QuantConnect.Algorithm.CSharp
 
         /// <summary>
         /// Data Points count of all timeslices of algorithm
-        /// </summary>
-        public long DataPoints => 15228955;
+        /// </summary>0
+        public virtual long DataPoints => 5117455;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -111,7 +117,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
-        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "16"},
             {"Average Win", "0.01%"},
@@ -132,14 +138,14 @@ namespace QuantConnect.Algorithm.CSharp
             {"Information Ratio", "-1.075"},
             {"Tracking Error", "0.107"},
             {"Treynor Ratio", "1.353"},
-            {"Total Fees", "$14.80"},
-            {"Estimated Strategy Capacity", "$860000000.00"},
-            {"Lowest Capacity Asset", "DC V5E8P9SH0U0X"},
+            {"Total Fees", "$19.76"},
+            {"Estimated Strategy Capacity", "$1300000000.00"},
+            {"Lowest Capacity Asset", "DC V5E8PHPRCHJ8|DC V5E8P9SH0U0X"},
             {"Fitness Score", "0"},
             {"Kelly Criterion Estimate", "0"},
             {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "-0.128"},
-            {"Return Over Maximum Drawdown", "-0.995"},
+            {"Sortino Ratio", "-0.129"},
+            {"Return Over Maximum Drawdown", "-0.997"},
             {"Portfolio Turnover", "0"},
             {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},

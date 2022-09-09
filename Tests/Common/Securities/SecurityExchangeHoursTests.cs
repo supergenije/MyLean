@@ -291,6 +291,15 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(new DateTime(2013, 11, 29), nextMarketOpen);
         }
 
+        [TestCaseSource(nameof(GetNextMarketOpenTestCases))]
+        public void GetNextMarketOpen(DateTime startTime, DateTime expectedNextMarketOpen, bool extendedMarket)
+        {
+            var exchangeHours = CreateUsFutureSecurityExchangeHoursWithExtendedHours();
+
+            var nextMarketOpen = exchangeHours.GetNextMarketOpen(startTime, extendedMarket);
+            Assert.AreEqual(expectedNextMarketOpen, nextMarketOpen);
+        }
+
         [Test]
         public void GetLastMarketOpenForContinuousSchedules()
         {
@@ -374,6 +383,15 @@ namespace QuantConnect.Tests.Common.Securities
             Assert.AreEqual(new DateTime(2018, 12, 10, 17, 30, 0), nextMarketOpen);
         }
 
+        [TestCaseSource(nameof(GetNextMarketCloseTestCases))]
+        public void GetNextMarketClose(DateTime startTime, DateTime expectedNextMarketClose, bool extendedMarket)
+        {
+            var exchangeHours = CreateUsFutureSecurityExchangeHoursWithExtendedHours();
+
+            var nextMarketClose = exchangeHours.GetNextMarketClose(startTime, extendedMarket);
+            Assert.AreEqual(expectedNextMarketClose, nextMarketClose);
+        }
+
         [Test]
         public void MarketIsNotOpenBeforeLateOpen()
         {
@@ -407,7 +425,7 @@ namespace QuantConnect.Tests.Common.Securities
         {
             var exchangeHours = CreateForexSecurityExchangeHours();
 
-            var startTime = new DateTime(2019, 1, 1, 16, 59, 59);
+            var startTime = new DateTime(2019, 1, 1, 16, 59, 59); // Friday
             var nextMarketOpen = exchangeHours.GetNextMarketOpen(startTime, false);
             Assert.AreEqual(new DateTime(2019, 1, 1, 17, 0, 0), nextMarketOpen);
         }
@@ -584,6 +602,84 @@ namespace QuantConnect.Tests.Common.Securities
                 sunday, monday, tuesday, wednesday, thursday, friday, saturday
             }.ToDictionary(x => x.DayOfWeek), earlyCloses, lateOpens);
             return exchangeHours;
+        }
+
+        public static SecurityExchangeHours CreateUsFutureSecurityExchangeHoursWithExtendedHours()
+        {
+            var sunday = new LocalMarketHours(
+                DayOfWeek.Sunday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(18, 0, 0), new TimeSpan(1, 0 ,0, 0))
+            );
+            var monday = new LocalMarketHours(
+                DayOfWeek.Monday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(0, 0, 0), new TimeSpan(9, 30, 0)),
+                new MarketHoursSegment(MarketHoursState.Market, new TimeSpan(9, 30, 0), new TimeSpan(16, 0, 0)),
+                new MarketHoursSegment(MarketHoursState.PostMarket, new TimeSpan(18, 0, 0), new TimeSpan(1, 0, 0, 0))
+            );
+            var tuesday = new LocalMarketHours(
+                DayOfWeek.Tuesday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(0, 0, 0), new TimeSpan(9, 30, 0)),
+                new MarketHoursSegment(MarketHoursState.Market, new TimeSpan(9, 30, 0), new TimeSpan(16, 0, 0)),
+                new MarketHoursSegment(MarketHoursState.PostMarket, new TimeSpan(18, 0, 0), new TimeSpan(1, 0, 0, 0))
+            );
+            var wednesday = new LocalMarketHours(
+                DayOfWeek.Wednesday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(0, 0, 0), new TimeSpan(9, 30, 0)),
+                new MarketHoursSegment(MarketHoursState.Market, new TimeSpan(9, 30, 0), new TimeSpan(16, 0, 0)),
+                new MarketHoursSegment(MarketHoursState.PostMarket, new TimeSpan(18, 0, 0), new TimeSpan(1, 0, 0, 0))
+            );
+            var thursday = new LocalMarketHours(
+                DayOfWeek.Thursday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(0, 0, 0), new TimeSpan(9, 30, 0)),
+                new MarketHoursSegment(MarketHoursState.Market, new TimeSpan(9, 30, 0), new TimeSpan(16, 0, 0)),
+                new MarketHoursSegment(MarketHoursState.PostMarket, new TimeSpan(18, 0, 0), new TimeSpan(1, 0, 0, 0))
+            );
+            var friday = new LocalMarketHours(
+                DayOfWeek.Friday,
+                new MarketHoursSegment(MarketHoursState.PreMarket, new TimeSpan(0, 0, 0), new TimeSpan(9, 30, 0)),
+                new MarketHoursSegment(MarketHoursState.Market, new TimeSpan(9, 30, 0), new TimeSpan(16, 0, 0))
+            );
+            var saturday = LocalMarketHours.ClosedAllDay(DayOfWeek.Saturday);
+
+            var earlyCloses = new Dictionary<DateTime, TimeSpan> { { new DateTime(2013, 11, 28), new TimeSpan(10, 30, 0) },
+                { new DateTime(2013, 11, 29), new TimeSpan(12, 15, 0)} };
+            var lateOpens = new Dictionary<DateTime, TimeSpan>();
+            var exchangeHours = new SecurityExchangeHours(TimeZones.NewYork, USHoliday.Dates.Select(x => x.Date), new[]
+            {
+                sunday, monday, tuesday, wednesday, thursday, friday, saturday
+            }.ToDictionary(x => x.DayOfWeek), earlyCloses, lateOpens);
+            return exchangeHours;
+        }
+
+        private static TestCaseData[] GetNextMarketOpenTestCases()
+        {
+            return new[]
+            {
+                new TestCaseData(new DateTime(2022, 1, 1), new DateTime(2022, 1, 3, 9, 30, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 3, 8, 0, 0), new DateTime(2022, 1, 3, 9, 30, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 2, 18, 0, 0), new DateTime(2022, 1, 3, 18, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 3, 12, 0, 0), new DateTime(2022, 1, 3, 18, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 3, 16, 0, 0), new DateTime(2022, 1, 3, 18, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 1), new DateTime(2022, 1, 2, 18, 0, 0), true)
+            };
+        }
+
+        private static TestCaseData[] GetNextMarketCloseTestCases()
+        {
+            return new[]
+            {
+                new TestCaseData(new DateTime(2022, 1, 1), new DateTime(2022, 1, 3, 16, 0, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 2), new DateTime(2022, 1, 3, 16, 0, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 3), new DateTime(2022, 1, 3, 16, 0, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 3, 10, 0, 0), new DateTime(2022, 1, 3, 16, 0, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 3, 18, 0, 0), new DateTime(2022, 1, 4, 16, 0, 0), false),
+                new TestCaseData(new DateTime(2022, 1, 1), new DateTime(2022, 1, 3, 16, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 2), new DateTime(2022, 1, 3, 16, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 2, 18, 0, 0), new DateTime(2022, 1, 3, 16, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 3), new DateTime(2022, 1, 3, 16, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 3, 10, 0, 0), new DateTime(2022, 1, 3, 16, 0, 0), true),
+                new TestCaseData(new DateTime(2022, 1, 3, 18, 0, 0), new DateTime(2022, 1, 4, 16, 0, 0), true),
+            };
         }
     }
 }

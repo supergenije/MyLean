@@ -21,15 +21,15 @@
   //Research notebook
   //"composer-dll-directory": ".",
 
-  //Object store directory name for Research Notebook
-  "research-object-store-name": "QuantBook",
-
   // engine
   "data-folder": "../../../Data/",
 
   // debugging configuration - options for debugging-method LocalCmdLine, VisualStudio, Debugpy, PyCharm
   "debugging": false,
   "debugging-method": "LocalCmdline",
+
+  // location of a python virtual env to use libraries from
+  //"python-venv": "/venv",
 
   // handlers
   "log-handler": "QuantConnect.Logging.CompositeLogHandler",
@@ -48,6 +48,12 @@
   "symbol-minute-limit": 10000,
   "symbol-second-limit": 10000,
   "symbol-tick-limit": 10000,
+
+  // log missing data files, useful for debugging
+  "show-missing-data-logs": false,
+
+  // For live trading during warmup we limit the amount of historical data fetched from the history provider and expect the data to be on disk for older data
+  "maximum-warmup-history-days-look-back": 5,
 
   // limits the amount of data points per chart series. Applies only for backtesting
   "maximum-data-points-per-chart-series": 4000,
@@ -198,7 +204,7 @@
   "zerodha-api-key": "",
   "zerodha-product-type": "MIS", //MIS(Intraday) or CNC(Delivery) or NRML(Carry Forward)
   "zerodha-trading-segment": "EQUITY", // EQUITY(NSE,BSE) or COMMODITY (MCX)
-  "zerodha-history-subscription": false, // Enable this if History API Subscription available
+  "zerodha-history-subscription": "false", // "true" if History API Subscription available
 
   //samco configuration go to https://www.samco.in/stocknote-api
   "samco-client-id": "",
@@ -307,7 +313,8 @@
       "result-handler": "QuantConnect.Lean.Engine.Results.LiveTradingResultHandler",
       "data-feed-handler": "QuantConnect.Lean.Engine.DataFeeds.LiveTradingDataFeed",
       "real-time-handler": "QuantConnect.Lean.Engine.RealTime.LiveTradingRealTimeHandler",
-      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler"
+      "transaction-handler": "QuantConnect.Lean.Engine.TransactionHandlers.BrokerageTransactionHandler",
+      "history-provider": [ "TradierBrokerage", "SubscriptionDataReaderHistoryProvider" ]
     },
 
     // defines the 'live-interactive' environment

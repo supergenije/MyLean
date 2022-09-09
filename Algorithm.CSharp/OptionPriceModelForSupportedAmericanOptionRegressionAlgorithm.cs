@@ -19,7 +19,7 @@ using QuantConnect.Securities.Option;
 namespace QuantConnect.Algorithm.CSharp
 {
     /// <summary>
-    /// Regression algorithm excersizing an equity covered American style option, using an option price model
+    /// Regression algorithm exercising an equity covered American style option, using an option price model
     /// that supports American style options and asserting that the option price model is used.
     /// </summary>
     public class OptionPriceModelForSupportedAmericanOptionRegressionAlgorithm : OptionPriceModelForOptionStylesBaseRegressionAlgorithm
@@ -41,7 +41,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public override long DataPoints => 1781481;
+        public override long DataPoints => 861931;
 
         /// <summary>
         /// Data Points count of the algorithm history

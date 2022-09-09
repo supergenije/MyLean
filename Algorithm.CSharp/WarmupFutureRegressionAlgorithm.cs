@@ -28,11 +28,12 @@ namespace QuantConnect.Algorithm.CSharp
     /// </summary>
     public class WarmupFutureRegressionAlgorithm : QCAlgorithm, IRegressionAlgorithmDefinition
     {
-        private List<DateTime> _continuousWarmupTimes = new();
-        private List<DateTime> _chainWarmupTimes = new();
         // S&P 500 EMini futures
         private const string RootSP500 = Futures.Indices.SP500EMini;
         public Symbol SP500 = QuantConnect.Symbol.Create(RootSP500, SecurityType.Future, Market.CME);
+
+        protected List<DateTime> ContinuousWarmupTimes { get; } = new();
+        protected List<DateTime> ChainWarmupTimes { get; } = new();
 
         /// <summary>
         /// Initialize your algorithm and add desired assets.
@@ -60,7 +61,7 @@ namespace QuantConnect.Algorithm.CSharp
                 {
                     throw new Exception("Continuous contract price is not set!");
                 }
-                _continuousWarmupTimes.Add(Time);
+                ContinuousWarmupTimes.Add(Time);
             }
 
             foreach (var chain in slice.FutureChains)
@@ -81,7 +82,7 @@ namespace QuantConnect.Algorithm.CSharp
                         {
                             throw new Exception("Contract price is not set!");
                         }
-                        _chainWarmupTimes.Add(Time);
+                        ChainWarmupTimes.Add(Time);
                     }
                     else if (!Portfolio.Invested && IsMarketOpen(contract.Symbol))
                     {
@@ -93,16 +94,16 @@ namespace QuantConnect.Algorithm.CSharp
 
         public override void OnEndOfAlgorithm()
         {
-            AssertDataTime(new DateTime(2013, 10, 07, 0, 0, 0), new DateTime(2013, 10, 08, 0, 0, 0), _chainWarmupTimes);
-            AssertDataTime(new DateTime(2013, 10, 07, 0, 0, 0), new DateTime(2013, 10, 08, 0, 0, 0), _continuousWarmupTimes);
+            AssertDataTime(new DateTime(2013, 10, 07, 20, 0, 0), new DateTime(2013, 10, 08, 20, 0, 0), ChainWarmupTimes);
+            AssertDataTime(new DateTime(2013, 10, 07, 20, 0, 0), new DateTime(2013, 10, 08, 20, 0, 0), ContinuousWarmupTimes);
         }
 
-        private void AssertDataTime(DateTime start, DateTime end, List<DateTime> times)
+        protected void AssertDataTime(DateTime start, DateTime end, List<DateTime> times)
         {
             var count = 0;
             do
             {
-                if (Securities[SP500].Exchange.Hours.IsOpen(start.AddMinutes(-1), true))
+                if (Securities[SP500].Exchange.Hours.IsOpen(start.AddMinutes(-1), false))
                 {
                     if (times[count] != start)
                     {
@@ -111,7 +112,14 @@ namespace QuantConnect.Algorithm.CSharp
                     // if the market is closed there will be no data, so stop moving the index counter
                     count++;
                 }
-                start = start.AddMinutes(1);
+                if (Settings.WarmupResolution.HasValue)
+                {
+                    start = start.Add(Settings.WarmupResolution.Value.ToTimeSpan());
+                }
+                else
+                {
+                    start = start.AddMinutes(1);
+                }
             }
             while (start < end);
         }
@@ -129,7 +137,7 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// Data Points count of all timeslices of algorithm
         /// </summary>
-        public long DataPoints => 86905;
+        public virtual long DataPoints => 21677;
 
         /// <summary>
         /// Data Points count of the algorithm history
@@ -139,36 +147,36 @@ namespace QuantConnect.Algorithm.CSharp
         /// <summary>
         /// This is used by the regression test system to indicate what the expected statistics are from running the algorithm
         /// </summary>
-        public Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
+        public virtual Dictionary<string, string> ExpectedStatistics => new Dictionary<string, string>
         {
             {"Total Trades", "1"},
             {"Average Win", "0%"},
             {"Average Loss", "0%"},
-            {"Compounding Annual Return", "224.153%"},
-            {"Drawdown", "1.500%"},
+            {"Compounding Annual Return", "130.234%"},
+            {"Drawdown", "1.400%"},
             {"Expectancy", "0"},
-            {"Net Profit", "0.971%"},
-            {"Sharpe Ratio", "35.085"},
+            {"Net Profit", "0.621%"},
+            {"Sharpe Ratio", "48"},
             {"Probabilistic Sharpe Ratio", "0%"},
             {"Loss Rate", "0%"},
             {"Win Rate", "0%"},
             {"Profit-Loss Ratio", "0"},
-            {"Alpha", "-5.591"},
-            {"Beta", "0.727"},
-            {"Annual Standard Deviation", "0.176"},
-            {"Annual Variance", "0.031"},
-            {"Information Ratio", "-151.136"},
-            {"Tracking Error", "0.066"},
-            {"Treynor Ratio", "8.515"},
-            {"Total Fees", "$1.85"},
-            {"Estimated Strategy Capacity", "$5500000.00"},
+            {"Alpha", "-3.382"},
+            {"Beta", "0.742"},
+            {"Annual Standard Deviation", "0.18"},
+            {"Annual Variance", "0.032"},
+            {"Information Ratio", "-120.79"},
+            {"Tracking Error", "0.063"},
+            {"Treynor Ratio", "11.65"},
+            {"Total Fees", "$2.15"},
+            {"Estimated Strategy Capacity", "$120000000.00"},
             {"Lowest Capacity Asset", "ES VP274HSU1AF5"},
-            {"Fitness Score", "0.208"},
+            {"Fitness Score", "0.14"},
             {"Kelly Criterion Estimate", "0"},
             {"Kelly Criterion Probability Value", "0"},
-            {"Sortino Ratio", "17.639"},
-            {"Return Over Maximum Drawdown", "126.711"},
-            {"Portfolio Turnover", "0.208"},
+            {"Sortino Ratio", "79228162514264337593543950335"},
+            {"Return Over Maximum Drawdown", "-60.809"},
+            {"Portfolio Turnover", "0.28"},
             {"Total Insights Generated", "0"},
             {"Total Insights Closed", "0"},
             {"Total Insights Analysis Completed", "0"},
@@ -182,7 +190,7 @@ namespace QuantConnect.Algorithm.CSharp
             {"Mean Population Magnitude", "0%"},
             {"Rolling Averaged Population Direction", "0%"},
             {"Rolling Averaged Population Magnitude", "0%"},
-            {"OrderListHash", "4a00c10c083332bf19a18ce24ab6d687"}
+            {"OrderListHash", "8f7633f23a8b3e6fa396cdb0bbff970a"}
         };
     }
 }

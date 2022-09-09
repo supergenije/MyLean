@@ -127,25 +127,26 @@ namespace QuantConnect.Research
                     new AlgorithmManager(false));
                 systemHandlers.LeanManager.SetAlgorithm(this);
 
+                ProjectId = Config.GetInt("project-id");
+
                 algorithmHandlers.DataPermissionsManager.Initialize(new AlgorithmNodePacket(PacketType.BacktestNode)
                 {
                     UserToken = Config.Get("api-access-token"),
                     UserId = Config.GetInt("job-user-id"),
-                    ProjectId = Config.GetInt("project-id"),
+                    ProjectId = ProjectId,
                     OrganizationId = Config.Get("job-organization-id"),
                     Version = Globals.Version
                 });
 
-                algorithmHandlers.ObjectStore.Initialize(Config.Get("research-object-store-name", "QuantBook"),
-                    Config.GetInt("job-user-id"),
-                    Config.GetInt("project-id"),
+                algorithmHandlers.ObjectStore.Initialize(Config.GetInt("job-user-id"),
+                    ProjectId,
                     Config.Get("api-access-token"),
                     new Controls
                     {
                         // if <= 0 we disable periodic persistence and make it synchronous
                         PersistenceIntervalSeconds = -1,
-                        StorageLimitMB = Config.GetInt("storage-limit-mb", 5),
-                        StorageFileCount = Config.GetInt("storage-file-count", 100),
+                        StorageLimit = Config.GetValue("storage-limit", 10737418240L),
+                        StorageFileCount = Config.GetInt("storage-file-count", 10000),
                         StoragePermissions = (FileAccess) Config.GetInt("storage-permissions", (int)FileAccess.ReadWrite)
                     });
                 SetObjectStore(algorithmHandlers.ObjectStore);
@@ -317,8 +318,11 @@ namespace QuantConnect.Research
         /// <param name="start">The history request start time</param>
         /// <param name="end">The history request end time. Defaults to 1 day if null</param>
         /// <param name="resolution">The resolution to request</param>
+        /// <param name="fillForward">True to fill forward missing data, false otherwise</param>
+        /// <param name="extendedMarket">True to include extended market hours data, false otherwise</param>
         /// <returns>A <see cref="OptionHistory"/> object that contains historical option data.</returns>
-        public OptionHistory GetOptionHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null)
+        public OptionHistory GetOptionHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null,
+            bool fillForward = true, bool extendedMarket = false)
         {
             if (!end.HasValue || end.Value == start)
             {
@@ -328,7 +332,7 @@ namespace QuantConnect.Research
             // Load a canonical option Symbol if the user provides us with an underlying Symbol
             if (!symbol.SecurityType.IsOption())
             {
-                var option = AddOption(symbol, resolution, symbol.ID.Market);
+                var option = AddOption(symbol, resolution, symbol.ID.Market, fillForward);
 
                 // Allow 20 strikes from the money for futures. No expiry filter is applied
                 // so that any future contract provided will have data returned.
@@ -359,15 +363,18 @@ namespace QuantConnect.Research
                     if (symbol.Underlying.SecurityType == SecurityType.Equity)
                     {
                         // only add underlying if not present
-                        AddEquity(symbol.Underlying.Value, resolutionToUseForUnderlying);
+                        AddEquity(symbol.Underlying.Value, resolutionToUseForUnderlying, fillDataForward: fillForward,
+                            extendedMarketHours: extendedMarket);
                     }
                     if (symbol.Underlying.SecurityType == SecurityType.Future && symbol.Underlying.IsCanonical())
                     {
-                        AddFuture(symbol.Underlying.ID.Symbol, resolutionToUseForUnderlying);
+                        AddFuture(symbol.Underlying.ID.Symbol, resolutionToUseForUnderlying, fillDataForward: fillForward,
+                            extendedMarketHours: extendedMarket);
                     }
                     else if (symbol.Underlying.SecurityType == SecurityType.Future)
                     {
-                        AddFutureContract(symbol.Underlying, resolutionToUseForUnderlying);
+                        AddFutureContract(symbol.Underlying, resolutionToUseForUnderlying, fillDataForward: fillForward,
+                            extendedMarketHours: extendedMarket);
                     }
                 }
                 var allSymbols = new List<Symbol>();
@@ -396,7 +403,7 @@ namespace QuantConnect.Research
                 symbols = new List<Symbol>{ symbol };
             }
 
-            return new OptionHistory(History(symbols, start, end.Value, resolution));
+            return new OptionHistory(History(symbols, start, end.Value, resolution, fillForward, extendedMarket));
         }
 
         /// <summary>
@@ -406,8 +413,11 @@ namespace QuantConnect.Research
         /// <param name="start">The history request start time</param>
         /// <param name="end">The history request end time. Defaults to 1 day if null</param>
         /// <param name="resolution">The resolution to request</param>
+        /// <param name="fillForward">True to fill forward missing data, false otherwise</param>
+        /// <param name="extendedMarket">True to include extended market hours data, false otherwise</param>
         /// <returns>A <see cref="FutureHistory"/> object that contains historical future data.</returns>
-        public FutureHistory GetFutureHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null)
+        public FutureHistory GetFutureHistory(Symbol symbol, DateTime start, DateTime? end = null, Resolution? resolution = null,
+            bool fillForward = true, bool extendedMarket = false)
         {
             if (!end.HasValue || end.Value == start)
             {
@@ -437,7 +447,7 @@ namespace QuantConnect.Research
                 allSymbols.Add(symbol);
             }
 
-            return new FutureHistory(History(allSymbols, start, end.Value, resolution));
+            return new FutureHistory(History(allSymbols, start, end.Value, resolution, fillForward, extendedMarket));
         }
 
         /// <summary>

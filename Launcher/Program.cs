@@ -21,6 +21,7 @@ using QuantConnect.Configuration;
 using QuantConnect.Lean.Engine;
 using QuantConnect.Logging;
 using QuantConnect.Packets;
+using QuantConnect.Python;
 using QuantConnect.Util;
 
 namespace QuantConnect.Lean.Launcher
@@ -76,6 +77,9 @@ namespace QuantConnect.Lean.Launcher
                 Log.Error(jobNullMessage);
                 throw new ArgumentException(jobNullMessage);
             }
+
+            // Activate our PythonVirtualEnvironment
+            PythonInitializer.ActivatePythonVirtualEnvironment(job.PythonVirtualEnvironment);
 
             // if the job version doesn't match this instance version then we can't process it
             // we also don't want to reprocess redelivered jobs
@@ -134,18 +138,7 @@ namespace QuantConnect.Lean.Launcher
             Log.LogHandler.DisposeSafely();
             OS.CpuPerformanceCounter.DisposeSafely();
 
-            if (PythonEngine.IsInitialized)
-            {
-                try
-                {
-                    var pyGIle = Py.GIL();
-                    PythonEngine.Shutdown();
-                }
-                catch (Exception e)
-                {
-                    Log.Error(e, "Exception shutting down python");
-                }
-            }
+            PythonInitializer.Shutdown();
 
             Log.Trace("Program.Main(): Exiting Lean...");
             Environment.Exit(exitCode);
