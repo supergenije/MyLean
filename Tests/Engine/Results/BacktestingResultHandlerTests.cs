@@ -88,7 +88,7 @@ namespace QuantConnect.Tests.Engine.Results
             //benchmarkPerformance = benchmarkPerformance.After(benchmarkPerformance.GetKeyAt(1));
             //---------------------------------------------------------------
 
-            //Frame.CreateEmpty<DateTime, string>().Join("equity", equityPerformance).Join("bench", benchmarkPerformance).Join("perf", performance).Print();
+            Frame.CreateEmpty<DateTime, string>().Join("equity", equityPerformance).Join("bench", benchmarkPerformance).Join("perf", performance).Print();
             // Before 2020-01-10, by uncommenting the line above, it produces this Frame in master for `BasicTemplateDailyAlgorithm`:
             // ====================================================================================
             // |                           equity               bench                perf         |

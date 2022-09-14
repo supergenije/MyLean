@@ -299,7 +299,7 @@ namespace QuantConnect.Util
                                         return false;
                                     }
                                 }
-                            )
+                            ) 
                             .FirstOrDefault();
 
                         if (selectedPart == null)
